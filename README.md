@@ -108,9 +108,9 @@ $$
 
 ## References
 
-* Schulman et al., *Proximal Policy Optimization Algorithms*, arXiv:1707.06347
+
 * Hugging Face TRL Documentation: [https://huggingface.co/docs/trl](https://huggingface.co/docs/trl)
-* Christiano et al., *Deep Reinforcement Learning from Human Preferences*, NeurIPS 2017
+
 
 ---
 
