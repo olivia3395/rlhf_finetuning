@@ -86,15 +86,15 @@ pip install transformers trl datasets accelerate pandas
 
 ## Mathematical Formulation
 
-Given model parameters \( \theta \), reward \( r(x, y) \), and baseline policy \( \pi_{\text{ref}} \):
+Given model parameters $ \theta $, reward $ r(x, y) $, and baseline policy $ \pi_{\text{ref}}$:
 
 $$
 \max_\theta \mathbb{E}_{x \sim D, y \sim \pi_\theta}
 \left[ r(x, y) - \beta \, \mathrm{KL}(\pi_\theta(y|x) \| \pi_{\text{ref}}(y|x)) \right]
 $$
 
-- \( r(x, y) \): reward function defined by user  
-- \( \beta \): regularization coefficient balancing alignment and stability
+- $ r(x, y) $: reward function defined by user  
+- $ \beta $: regularization coefficient balancing alignment and stability
 
 
 ## Example Use Cases
