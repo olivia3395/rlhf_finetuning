@@ -1,9 +1,8 @@
 
 # RLHF-Custom: RLHF on a Custom Text Dataset (Reward-Driven Alignment)
 
-This repo implements a **clean, method-first RLHF pipeline** for aligning a pretrained causal LM to **human-defined preferences** using an explicit reward signal—either a **lightweight heuristic** (rules, style constraints) or a **learned reward model**.  
+We implement a **clean, method-first RLHF pipeline** for aligning a pretrained causal LM to **human-defined preferences** using an explicit reward signal—either a **lightweight heuristic** (rules, style constraints) or a **learned reward model**.  
 Compared to standard supervised fine-tuning, RLHF optimizes *behavior* directly by iteratively reinforcing responses that score higher under your preference metric.
-
 
 
 ## Why RLHF?
@@ -170,5 +169,4 @@ Intuition:
 * Hugging Face TRL docs: [https://huggingface.co/docs/trl](https://huggingface.co/docs/trl)
 * TRL GitHub: [https://github.com/huggingface/trl](https://github.com/huggingface/trl)
 
-```
 
