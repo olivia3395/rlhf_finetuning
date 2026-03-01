@@ -145,8 +145,8 @@ Given prompts $x \sim D$, model policy $\pi_\theta(y \mid x)$, reference policy 
 $$
 \max_{\theta};\mathbb{E}*{x \sim D,; y \sim \pi*{\theta}(\cdot \mid x)}
 \Big[
-r(x,y) - \beta,
-\mathrm{KL}!\left(\pi_{\theta}(\cdot \mid x),|,\pi_{\mathrm{ref}}(\cdot \mid x)\right)
+r(x,y) - \beta
+\mathrm{KL}\left(\pi_{\theta}(\cdot \mid x),|,\pi_{\mathrm{ref}}(\cdot \mid x)\right)
 \Big].
 $$
 
