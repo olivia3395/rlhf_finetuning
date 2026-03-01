@@ -7,7 +7,6 @@
 This repository demonstrates a **method-driven pipeline** for aligning a pretrained language model with human-defined preferences through **Reinforcement Learning from Human Feedback (RLHF)**.  
 Unlike standard fine-tuning, this approach uses an explicit **reward model or heuristic reward function** to iteratively improve model behavior based on qualitative criteria.
 
----
 
 ## Motivation
 
@@ -19,7 +18,7 @@ This project provides a minimal yet extensible implementation for:
 - Integrating **custom reward functions** (semantic, stylistic, or rule-based);
 - Supporting **any Hugging Face causal language model** (e.g., GPT-2, StarCoder, Falcon).
 
----
+
 
 ## Methodology Overview
 
@@ -59,7 +58,7 @@ At each iteration:
 
 After training, the model is tested on new prompts to examine alignment improvements.
 
----
+
 
 ## Implementation Highlights
 
@@ -70,7 +69,7 @@ After training, the model is tested on new prompts to examine alignment improvem
 | **Reward Mechanism**   | Custom function or learned reward model                |
 | **Training Objective** | Maximize reward – β × KL divergence                    |
 
----
+
 
 ## Setup
 
@@ -82,7 +81,7 @@ pip install transformers trl datasets accelerate pandas
 > Go to *Runtime → Change runtime type → GPU* 
 
 
----
+
 
 ## Mathematical Formulation
 
@@ -104,7 +103,6 @@ $$
 * Reinforcement-based summarization optimization
 * Domain-specific response alignment (e.g., clinical dialogue, financial Q&A)
 
----
 
 ## References
 
