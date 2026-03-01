@@ -1,74 +1,131 @@
 
+# RLHF-Custom: RLHF on a Custom Text Dataset (Reward-Driven Alignment)
+
+This repo implements a **clean, method-first RLHF pipeline** for aligning a pretrained causal LM to **human-defined preferences** using an explicit reward signal—either a **lightweight heuristic** (rules, style constraints) or a **learned reward model**.  
+Compared to standard supervised fine-tuning, RLHF optimizes *behavior* directly by iteratively reinforcing responses that score higher under your preference metric.
 
 
 
-# RLHF-Custom: Reinforcement Learning from Human Feedback on Custom Text Dataset
+## Why RLHF?
 
-This repository demonstrates a **method-driven pipeline** for aligning a pretrained language model with human-defined preferences through **Reinforcement Learning from Human Feedback (RLHF)**.  
-Unlike standard fine-tuning, this approach uses an explicit **reward model or heuristic reward function** to iteratively improve model behavior based on qualitative criteria.
+LLMs can be fluent yet misaligned: overly long, inconsistent in tone, or ignoring formatting rules. RLHF provides a practical loop:
 
+- **Define what “good” means** (reward)
+- **Sample outputs from the model**
+- **Update the model to increase expected reward**
+- **Keep it stable** via KL-regularization against a reference policy
 
-## Motivation
-
-Modern large language models (LLMs) often generate fluent but misaligned text—responses that are verbose, off-topic, or stylistically inconsistent with user preferences.  
-To address this, **RLHF** offers a principled framework to incorporate human-like evaluation signals into model training.
-
-This project provides a minimal yet extensible implementation for:
-- Applying **RLHF on a custom dataset** of prompts and responses;
-- Integrating **custom reward functions** (semantic, stylistic, or rule-based);
-- Supporting **any Hugging Face causal language model** (e.g., GPT-2, StarCoder, Falcon).
-
+This project is meant to stay minimal but extensible:
+- works with **any Hugging Face causal LM** (`AutoModelForCausalLM`)
+- supports **custom datasets** (e.g., `.parquet`)
+- supports **reward functions** that are heuristic, learned, or hybrid
+- uses **PPO** from Hugging Face **TRL**
 
 
-## Methodology Overview
+## Pipeline Overview (End-to-End)
 
-### 1. **Supervised Initialization**
-We start from a pretrained model (`AutoModelForCausalLM`) such as `distilgpt2`.  
-A small dataset of prompt–response pairs is loaded from a local `.parquet` file or defined manually.
+### 1) Supervised Initialization (Optional but recommended)
+Start from a pretrained model (e.g., `distilgpt2`) and optionally run a short **SFT warm-start** on prompt–response pairs to reduce exploration cost.
 
-### 2. **Reward Function Design**
-A reward function quantifies response quality.  
-This can be:
-- **Heuristic-based:** e.g., brevity, politeness, factuality.
-- **Model-based:** e.g., a reward model trained for preference comparison.
+**Data format (typical):**
+- `prompt`: user query / instruction
+- `response`: preferred response (for SFT), or empty if PPO-only
+
+
+
+
+### 2) Reward Design (Heuristic, Model-Based, or Hybrid)
+
+The reward function is the core of alignment. You can start simple and iterate:
+- **Style/format rewards** (length, politeness markers, Markdown structure, banned phrases)
+- **Semantic rewards** (topic relevance, entailment, embedding similarity)
+- **Safety & constraint rewards** (PII avoidance, refusal compliance)
+- **Learned reward model** (pairwise preferences: “A better than B”)
+
+A **hybrid** reward often works best: combine multiple signals with weights.
 
 ```python
-def compute_reward(query, response):
-    # Example: penalize long answers
-    return -len(response.split())
+import re
+
+def compute_reward(prompt: str, response: str) -> float:
+    # Example: encourage concise + structured answers
+    length_penalty = -0.01 * len(response.split())
+    has_bullets = 0.2 if re.search(r"^\s*[-*]\s+", response, flags=re.M) else 0.0
+    no_wall_of_text = 0.2 if response.count("\n") >= 2 else -0.1
+    return length_penalty + has_bullets + no_wall_of_text
 ````
 
-### 3. **PPO Fine-Tuning**
+**Practical tips**
 
-We apply **Proximal Policy Optimization (PPO)** via the [TRL library](https://github.com/huggingface/trl) to adjust model outputs toward higher reward responses.
+* Normalize rewards to a stable range (e.g., `[-1, 1]`)
+* Avoid sparse rewards (all zeros) early on
+* Log each reward component so you can debug what the policy is learning
+
+
+### 3) PPO Fine-Tuning (TRL)
+
+We use **Proximal Policy Optimization (PPO)** to update the policy while controlling drift from a **reference model** (KL penalty). At each PPO step:
+
+1. Sample a response `y ~ πθ(·|x)`
+2. Score it with reward `r(x, y)`
+3. Update θ to increase reward while discouraging large distribution shifts
 
 ```python
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from trl import PPOTrainer, PPOConfig
-config = PPOConfig(model_name="distilgpt2", learning_rate=1e-5, batch_size=2)
-ppo_trainer = PPOTrainer(config=config, model=model, tokenizer=tokenizer, dataset=dataset)
+
+model_name = "distilgpt2"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForCausalLM.from_pretrained(model_name)
+
+config = PPOConfig(
+    model_name=model_name,
+    learning_rate=1e-5,
+    batch_size=2,
+    mini_batch_size=1,
+    gradient_accumulation_steps=1,
+)
+
+# dataset should yield dicts like {"query": "..."} or {"prompt": "..."}
+ppo_trainer = PPOTrainer(
+    config=config,
+    model=model,
+    tokenizer=tokenizer,
+    dataset=dataset,
+)
 ```
 
-At each iteration:
+**Common knobs you’ll likely tune**
 
-1. The model generates a response.
-2. The reward function scores it.
-3. PPO updates model parameters to increase expected reward while maintaining stability via KL regularization.
+* `β` / KL coefficient (or adaptive KL): too high → no learning; too low → collapse/drift
+* generation params (max_new_tokens, temperature, top_p): affects exploration
+* reward scaling/clipping: stabilizes training
 
-### 4. **Evaluation & Sampling**
 
-After training, the model is tested on new prompts to examine alignment improvements.
+### 4) Evaluation & Sampling
+
+After PPO, evaluation should be both:
+
+* **automatic** (reward, length stats, rule violation rate)
+* **human** (side-by-side comparison on a fixed prompt set)
+
+Recommended eval artifacts:
+
+* a small `eval_prompts.jsonl`
+* before/after samples saved in `outputs/`
+* summary metrics: mean reward, KL, length, diversity, refusal rate (if relevant)
 
 
 
 ## Implementation Highlights
 
-| Component              | Description                                            |
-| ---------------------- | ------------------------------------------------------ |
-| **Model Backbone**     | `distilgpt2` (lightweight GPT-2 variant; CPU-friendly) |
-| **Trainer**            | `PPOTrainer` from TRL (Proximal Policy Optimization)   |
-| **Reward Mechanism**   | Custom function or learned reward model                |
-| **Training Objective** | Maximize reward – β × KL divergence                    |
-
+| Component      | What it does                                                   |
+| -------------- | -------------------------------------------------------------- |
+| **Backbone**   | Any HF causal LM (default: `distilgpt2` for CPU-friendly runs) |
+| **RL Trainer** | TRL `PPOTrainer`                                               |
+| **Reward**     | User-defined heuristic, learned RM, or a weighted combination  |
+| **Stability**  | KL regularization against a frozen reference policy            |
+| **Data**       | Local `.parquet` or `datasets.Dataset`                         |
 
 
 ## Setup
@@ -77,39 +134,38 @@ After training, the model is tested on new prompts to examine alignment improvem
 pip install transformers trl datasets accelerate pandas
 ```
 
-> To run on GPU:
-> Go to *Runtime → Change runtime type → GPU* 
+**GPU tip (Colab):** `Runtime → Change runtime type → GPU`
 
 
 
+## Mathematical Objective (KL-Regularized RL)
 
-## Mathematical Formulation
+Given prompts (x \sim D), model policy ( \pi_\theta(y|x) ), reference policy ( \pi_{\mathrm{ref}}(y|x) ), and reward ( r(x, y) ), PPO approximately optimizes:
 
-Given model parameters $ \theta $, reward $ r(x, y) $, and baseline policy $ \pi_{\text{ref}}$:
+[
+\max_\theta ; \mathbb{E}*{x \sim D,; y \sim \pi*\theta(\cdot|x)}
+\Big[ r(x, y) - \beta,\mathrm{KL}\big(\pi_\theta(\cdot|x),|,\pi_{\mathrm{ref}}(\cdot|x)\big) \Big].
+]
 
-$$
-\max_\theta \mathbb{E}_{x \sim D, y \sim \pi_\theta}
-\left[ r(x, y) - \beta \, \mathrm{KL}(\pi_\theta(y|x) \| \pi_{\text{ref}}(y|x)) \right]
-$$
+Intuition:
 
-- $ r(x, y) $: reward function defined by user  
-- $ \beta $: regularization coefficient balancing alignment and stability
+* maximize responses that score higher under your preference signal
+* penalize drifting too far from the reference distribution
+
 
 
 ## Example Use Cases
 
-* Fine-tuning a conversational model for concise and polite answers
-* Adapting a code model (e.g., StarCoder) for cleaner, PEP8-compliant code generation
-* Reinforcement-based summarization optimization
-* Domain-specific response alignment (e.g., clinical dialogue, financial Q&A)
+* Train a chat model to be **concise, structured, and polite**
+* Align a code model (e.g., StarCoder) toward **PEP8 + lint-clean outputs**
+* RL-based summarization: optimize **coverage vs. brevity**
+* Domain alignment (finance/clinical): enforce **terminology + refusal rules**
 
 
 ## References
 
+* Hugging Face TRL docs: [https://huggingface.co/docs/trl](https://huggingface.co/docs/trl)
+* TRL GitHub: [https://github.com/huggingface/trl](https://github.com/huggingface/trl)
 
-* Hugging Face TRL Documentation: [https://huggingface.co/docs/trl](https://huggingface.co/docs/trl)
-
-
----
-
+```
 
