@@ -140,11 +140,16 @@ pip install transformers trl datasets accelerate pandas
 
 ## Mathematical Objective (KL-Regularized RL)
 
-Given prompts (x \sim D), model policy ( \pi_\theta(y|x) ), reference policy ( \pi_{\mathrm{ref}}(y|x) ), and reward ( r(x, y) ), PPO approximately optimizes:
-$
-\max_\theta ; \mathbb{E}*{x \sim D,; y \sim \pi*\theta(\cdot|x)}
-\Big[ r(x, y) - \beta,\mathrm{KL}\big(\pi_\theta(\cdot|x),|,\pi_{\mathrm{ref}}(\cdot|x)\big) \Big].
-$
+Given prompts \(x \sim D\), model policy \(\pi_\theta(y \mid x)\), reference policy
+\(\pi_{\mathrm{ref}}(y \mid x)\), and reward \(r(x, y)\), PPO approximately optimizes:
+
+$$
+\max_{\theta}\;\mathbb{E}_{x \sim D,\; y \sim \pi_{\theta}(\cdot \mid x)}
+\Big[
+r(x, y) - \beta\,
+\mathrm{KL}\!\left(\pi_{\theta}(\cdot \mid x)\,\|\,\pi_{\mathrm{ref}}(\cdot \mid x)\right)
+\Big].
+$$
 
 Intuition:
 
