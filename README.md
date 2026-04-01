@@ -1,30 +1,5 @@
 # RLHF-PPO: Controllable Text Generation via Reinforcement Learning from Human Feedback
 
-A **complete, production-quality** implementation of PPO-based RLHF for
-controllable language model fine-tuning. Covers everything from the mathematical
-foundations to a working training loop, multi-objective reward design, and
-evaluation utilities.
-
----
-
-## Table of Contents
-
-1. [Overview](#overview)
-2. [Theory: How RLHF-PPO Works](#theory)
-3. [Architecture](#architecture)
-4. [Reward Functions](#reward-functions)
-5. [Project Structure](#project-structure)
-6. [Quick Start](#quick-start)
-7. [Training](#training)
-8. [Evaluation](#evaluation)
-9. [Interactive Demo](#interactive-demo)
-10. [Configuration Reference](#configuration-reference)
-11. [Testing](#testing)
-12. [References](#references)
-
----
-
-## Overview
 
 **RLHF** (Reinforcement Learning from Human Feedback) is the technique used to
 align language models with human preferences — most famously in InstructGPT,
@@ -126,47 +101,10 @@ destabilise training.
          → sample action a     → used for GAE
 ```
 
----
+
 
 ## Architecture
 
-### Component Map
-
-```
-rlhf_ppo/
-├── config.py                    # All hyperparameters (single source of truth)
-│
-├── models/
-│   ├── policy_model.py          # PolicyModel (actor + value head)
-│   │                            # ReferenceModel (frozen, for KL)
-│   │                            # ValueHead (2-layer MLP)
-│   └── __init__.py
-│
-├── rewards/
-│   ├── reward_functions.py      # SentimentReward, ToxicityReward,
-│   │                            # FluencyReward, LengthReward,
-│   │                            # CompositeReward, RunningMeanStd
-│   └── __init__.py
-│
-├── training/
-│   ├── rollout_buffer.py        # RolloutBatch, compute_gae, whiten
-│   ├── ppo_trainer.py           # PPOTrainer, AdaptiveKLController, PPOStats
-│   ├── rlhf_trainer.py          # RLHFTrainer (full loop), RolloutCollector
-│   └── __init__.py
-│
-├── data/
-│   ├── dataset.py               # PromptDataset, SyntheticPromptDataset
-│   └── __init__.py
-│
-├── train.py                     # CLI entry point for training
-├── evaluate.py                  # Evaluation + comparison script
-├── demo.py                      # Interactive generation demo
-├── requirements.txt
-└── tests/
-    └── test_all.py              # 20+ unit tests across all components
-```
-
----
 
 ## Reward Functions
 
@@ -212,7 +150,6 @@ r_total = w_sent · r_sentiment
         + w_len  · r_length
 ```
 
----
 
 ## Quick Start
 
@@ -236,7 +173,6 @@ python train.py --synthetic --steps 50 --batch-size 8 --log-every 5
 python train.py --mode sentiment --steps 500
 ```
 
----
 
 ## Training
 
@@ -314,9 +250,9 @@ python evaluate.py --checkpoint outputs/rlhf_ppo/checkpoint-final \
 | `avg_length_words` | Mean response length in words |
 | `component_*` | Per-component reward means |
 
----
 
-## Interactive Demo
+
+## Demo
 
 ```bash
 # Interactive REPL (enter prompts, see generated continuations + rewards)
@@ -333,10 +269,9 @@ python demo.py --checkpoint outputs/rlhf_ppo/checkpoint-final --compare
 python demo.py --no-checkpoint
 ```
 
-The demo displays colour-coded rewards (🟢 positive / 🔴 negative) with
-a per-component breakdown for each generated continuation.
 
----
+
+
 
 ## Configuration Reference
 
@@ -377,7 +312,7 @@ a per-component breakdown for each generated continuation.
 | `target_sentiment` | `POSITIVE` | Target polarity |
 | `normalize_rewards` | `True` | Whiten rewards per batch |
 
----
+
 
 ## Testing
 
@@ -402,7 +337,6 @@ python tests/test_all.py
 - `PPOStats` arithmetic and serialisation
 - Diversity metrics (`distinct_n`, `average_length`)
 
----
 
 ## References
 
