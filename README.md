@@ -47,20 +47,22 @@
 
 
 
-## 📐 Theory: How RLHF-PPO Works
+## Theory: How RLHF-PPO Works
 
 ### 1 · The RLHF Objective
 
-Fine-tune a policy $\pi_\theta$ to maximise expected reward while staying close to the frozen reference model $\pi_\text{ref}$:
+Fine-tune a policy `pi_θ` to maximise expected reward while staying close to the frozen reference model `pi_ref`:
 
-$$\max_\theta \; \mathbb{E}_{s \sim \mathcal{D},\; a \sim \pi_\theta(\cdot|s)} \bigl[ r(s, a) \bigr] - \beta \cdot \mathrm{KL}\!\bigl(\pi_\theta(\cdot|s) \;\|\; \pi_\text{ref}(\cdot|s)\bigr)$$
+```
+max_θ  E[r(s, a)] - β · KL(π_θ(·|s) ‖ π_ref(·|s))
+```
 
 | Symbol | Meaning |
 |:---:|:---|
-| $s$ | Prompt (state) |
-| $a$ | Generated response (action) |
-| $r(s,a)$ | Composite reward signal |
-| $\beta$ | KL penalty — prevents reward hacking |
+| `s` | Prompt (state) |
+| `a` | Generated response (action) |
+| `r(s, a)` | Composite reward signal |
+| `β` | KL penalty — prevents reward hacking |
 
 <br/>
 
@@ -68,9 +70,11 @@ $$\max_\theta \; \mathbb{E}_{s \sim \mathcal{D},\; a \sim \pi_\theta(\cdot|s)} \
 
 Without the KL term the model quickly finds degenerate reward-maximising outputs. We fold it into **per-token rewards**:
 
-$$\hat{r}_t = r_\text{env} \cdot \mathbf{1}[t=T] \;-\; \beta \cdot \bigl(\log \pi_\theta(a_t) - \log \pi_\text{ref}(a_t)\bigr)$$
+```
+r̂_t = r_env · 1[t=T]  -  β · (log π_θ(a_t) - log π_ref(a_t))
+```
 
-The coefficient $\beta$ adapts automatically each step:
+The coefficient `β` adapts automatically each step:
 
 ```
 if KL > target × 1.5  →  β ← β × (1 + speed)   # tighten constraint
@@ -81,7 +85,10 @@ if KL < target / 1.5  →  β ← β × (1 - speed)   # relax constraint
 
 ### 3 · Generalised Advantage Estimation (GAE)
 
-$$\delta_t = r_t + \gamma V(s_{t+1}) - V(s_t), \qquad \hat{A}_t = \sum_{l=0}^{\infty} (\gamma\lambda)^l \delta_{t+l}$$
+```
+δ_t  = r_t + γ · V(s_{t+1}) - V(s_t)
+Â_t  = Σ_{l=0}^{∞} (γλ)^l · δ_{t+l}
+```
 
 GAE (λ = 0.95) smoothly interpolates between the high-variance Monte Carlo estimate (λ = 1) and the low-variance but biased TD estimate (λ = 0).
 
@@ -91,13 +98,19 @@ GAE (λ = 0.95) smoothly interpolates between the high-variance Monte Carlo esti
 
 For each rollout batch, we perform `ppo_epochs` gradient steps with **clipped surrogate loss**:
 
-$$\rho_t = \frac{\pi_\theta(a_t|s_t)}{\pi_\text{old}(a_t|s_t)}$$
+```
+ρ_t       = π_θ(a_t|s_t) / π_old(a_t|s_t)          # probability ratio
 
-$$\mathcal{L}_\text{CLIP} = -\mathbb{E}\!\left[\min\!\bigl(\rho_t \hat{A}_t,\; \mathrm{clip}(\rho_t, 1-\varepsilon, 1+\varepsilon)\hat{A}_t\bigr)\right]$$
+L_CLIP    = -E[ min(ρ_t · Â_t,  clip(ρ_t, 1-ε, 1+ε) · Â_t) ]
 
-$$\mathcal{L}_\text{total} = \mathcal{L}_\text{CLIP} + c_\text{vf} \cdot \mathcal{L}_\text{VALUE} - c_\text{ent} \cdot \mathcal{L}_\text{ENTROPY}$$
+L_VALUE   = 0.5 · MSE(V_θ(s), R_t)                  # critic loss
 
-> 💡 The clip ratio $\varepsilon = 0.2$ prevents destabilising large policy updates.
+L_ENTROPY = -H[π_θ(·|s)]                             # exploration bonus
+
+L_total   = L_CLIP  +  c_vf · L_VALUE  -  c_ent · L_ENTROPY
+```
+
+> 💡 The clip ratio `ε = 0.2` prevents destabilising large policy updates.
 
 <br/>
 
@@ -131,22 +144,30 @@ Four differentiable reward signals are combined into a single weighted composite
 ### 😊 SentimentReward
 Uses **DistilBERT fine-tuned on SST-2** to steer outputs toward a target polarity:
 
-$$r_\text{sentiment} = 2 \cdot P(\text{target\_label}) - 1 \quad \in [-1, +1]$$
+```
+r_sentiment = 2 * P(target_label) - 1      # in [-1, +1]
+```
 
 ### ☣️ ToxicityReward
 Uses **toxic-bert** (keyword heuristic fallback) to penalise harmful content:
 
-$$r_\text{toxicity} = -\min\!\left(\frac{\text{toxicity\_score}}{\text{max\_toxicity}},\; 1.0\right)$$
+```
+r_toxicity = -min(toxicity_score / max_toxicity, 1.0)
+```
 
 ### 📝 FluencyReward
 Measures perplexity under a **frozen GPT-2** — lower perplexity means more natural text:
 
-$$r_\text{fluency} = \max\!\left(0,\; 1 - \frac{\log\,\text{ppl}}{\log\,\text{ppl}_\text{max}}\right)$$
+```
+r_fluency = max(0, 1 - log_ppl / log_ppl_max)
+```
 
 ### 📏 LengthReward
 Gaussian bell-curve centred on the ideal token count, discouraging degenerate outputs:
 
-$$r_\text{length} = 2\exp\!\left(-\tfrac{1}{2}\left(\tfrac{\text{len} - \text{ideal}}{\sigma}\right)^2\right) - 1$$
+```
+r_length = 2 * exp(-0.5 * ((len - ideal) / sigma)^2) - 1
+```
 
 ### 🧮 CompositeReward
 
@@ -238,7 +259,6 @@ python train.py --synthetic --steps 20 --batch-size 4 --log-every 2
 ```
 
 <br/>
-
 
 
 ## 📊 Evaluation
@@ -388,6 +408,7 @@ python tests/test_all.py
 
 
 <div align="center">
+
 
 
 </div>
