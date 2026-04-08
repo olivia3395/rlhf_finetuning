@@ -18,7 +18,7 @@
 
 <br/>
 
-[🚀 Quick Start](#-quick-start) · [📐 Theory](#-theory-how-rlhf-ppo-works) · [🏗️ Architecture](#️-architecture) · [🎯 Reward Design](#-reward-functions) · [📊 Evaluation](#-evaluation) · [📎 References](#-references)
+[🚀 Quick Start](#-quick-start) · [🏗️ Architecture](#️-architecture) · [🎯 Reward Design](#-reward-functions) · [📊 Evaluation](#-evaluation) · [📎 References](#-references)
 
 <br/>
 
@@ -47,74 +47,7 @@
 
 
 
-## Theory: How RLHF-PPO Works
-
-### 1 · The RLHF Objective
-
-Fine-tune a policy `pi_θ` to maximise expected reward while staying close to the frozen reference model `pi_ref`:
-
-```
-max_θ  E[r(s, a)] - β · KL(π_θ(·|s) ‖ π_ref(·|s))
-```
-
-| Symbol | Meaning |
-|:---:|:---|
-| `s` | Prompt (state) |
-| `a` | Generated response (action) |
-| `r(s, a)` | Composite reward signal |
-| `β` | KL penalty — prevents reward hacking |
-
-<br/>
-
-### 2 · The KL Penalty
-
-Without the KL term the model quickly finds degenerate reward-maximising outputs. We fold it into **per-token rewards**:
-
-```
-r̂_t = r_env · 1[t=T]  -  β · (log π_θ(a_t) - log π_ref(a_t))
-```
-
-The coefficient `β` adapts automatically each step:
-
-```
-if KL > target × 1.5  →  β ← β × (1 + speed)   # tighten constraint
-if KL < target / 1.5  →  β ← β × (1 - speed)   # relax constraint
-```
-
-<br/>
-
-### 3 · Generalised Advantage Estimation (GAE)
-
-```
-δ_t  = r_t + γ · V(s_{t+1}) - V(s_t)
-Â_t  = Σ_{l=0}^{∞} (γλ)^l · δ_{t+l}
-```
-
-GAE (λ = 0.95) smoothly interpolates between the high-variance Monte Carlo estimate (λ = 1) and the low-variance but biased TD estimate (λ = 0).
-
-<br/>
-
-### 4 · PPO Update
-
-For each rollout batch, we perform `ppo_epochs` gradient steps with **clipped surrogate loss**:
-
-```
-ρ_t       = π_θ(a_t|s_t) / π_old(a_t|s_t)          # probability ratio
-
-L_CLIP    = -E[ min(ρ_t · Â_t,  clip(ρ_t, 1-ε, 1+ε) · Â_t) ]
-
-L_VALUE   = 0.5 · MSE(V_θ(s), R_t)                  # critic loss
-
-L_ENTROPY = -H[π_θ(·|s)]                             # exploration bonus
-
-L_total   = L_CLIP  +  c_vf · L_VALUE  -  c_ent · L_ENTROPY
-```
-
-> 💡 The clip ratio `ε = 0.2` prevents destabilising large policy updates.
-
-<br/>
-
-### 5 · Actor-Critic Architecture
+## 🏗️ Architecture
 
 ```
               Prompt tokens
@@ -406,9 +339,7 @@ python tests/test_all.py
 <br/>
 
 
-
 <div align="center">
-
 
 
 </div>
